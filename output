@@ -1,0 +1,25 @@
+Choose an option: 1. Shorten URL 2. Expand URL 3. URL Details 4. Exit
+1
+Enter the long URL:
+https://www.example.com
+Enter custom alias (or leave blank):
+example
+Enter expiration date (yyyy-MM-ddTHH:mm, or leave blank):
+
+Error saving URL mappings: urlMappings.txt (Permission denied)
+Shortened URL: http://short.url/example
+Choose an option: 1. Shorten URL 2. Expand URL 3. URL Details 4. Exit
+2
+Enter the short URL:
+http://short.url/example
+Error saving URL mappings: urlMappings.txt (Permission denied)
+Original URL: https://www.example.com
+Choose an option: 1. Shorten URL 2. Expand URL 3. URL Details 4. Exit
+3
+Enter the short URL:
+http.//short.url/example
+URL Details: Invalid short URL
+Choose an option: 1. Shorten URL 2. Expand URL 3. URL Details 4. Exit
+4
+
+=== Code Execution Successful ===
