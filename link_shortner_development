@@ -1,0 +1,191 @@
+import java.io.*;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Scanner;
+import java.util.regex.Pattern;
+
+public class LinkShortener {
+    private HashMap<String, URLDetails> urlMap;
+    private HashMap<String, String> reverseUrlMap;
+    private static final String BASE_URL = "http://short.url/";
+    private static final String DATA_FILE = "urlMappings.txt";
+    private static final Pattern URL_PATTERN = Pattern.compile("^(http|https)://.*$");
+
+    public LinkShortener() {
+        urlMap = new HashMap<>();
+        reverseUrlMap = new HashMap<>();
+        loadMappings();
+    }
+
+    public String shortenURL(String longUrl, String customAlias, LocalDateTime expirationDate) {
+        if (!isValidURL(longUrl)) {
+            return "Invalid URL";
+        }
+
+        if (reverseUrlMap.containsKey(longUrl)) {
+            String existingShortUrl = reverseUrlMap.get(longUrl);
+            urlMap.get(existingShortUrl).setExpirationDate(expirationDate);  // Update expiration date
+            return BASE_URL + existingShortUrl;
+        }
+
+        String shortUrlKey;
+        if (customAlias != null && !customAlias.isEmpty()) {
+            if (urlMap.containsKey(customAlias)) {
+                return "Custom alias already in use";
+            }
+            shortUrlKey = customAlias;
+        } else {
+            do {
+                shortUrlKey = generateShortUrlKey(longUrl);
+            } while (urlMap.containsKey(shortUrlKey));
+        }
+
+        URLDetails urlDetails = new URLDetails(longUrl, expirationDate);
+        urlMap.put(shortUrlKey, urlDetails);
+        reverseUrlMap.put(longUrl, shortUrlKey);
+        saveMappings();
+        return BASE_URL + shortUrlKey;
+    }
+
+    public String expandURL(String shortUrl) {
+        String shortUrlKey = shortUrl.replace(BASE_URL, "");
+        URLDetails urlDetails = urlMap.get(shortUrlKey);
+        if (urlDetails == null || (urlDetails.getExpirationDate() != null && LocalDateTime.now().isAfter(urlDetails.getExpirationDate()))) {
+            return "Invalid or expired short URL";
+        }
+        urlDetails.incrementAccessCount();
+        saveMappings();
+        return urlDetails.getLongUrl();
+    }
+
+    public String getUrlDetails(String shortUrl) {
+        String shortUrlKey = shortUrl.replace(BASE_URL, "");
+        URLDetails urlDetails = urlMap.get(shortUrlKey);
+        if (urlDetails == null) {
+            return "Invalid short URL";
+        }
+        return urlDetails.toString();
+    }
+
+    private String generateShortUrlKey(String longUrl) {
+        int hash = longUrl.hashCode();
+        return Integer.toHexString(hash);
+    }
+
+    private void loadMappings() {
+        try (BufferedReader reader = new BufferedReader(new FileReader(DATA_FILE))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(",");
+                if (parts.length >= 4) {
+                    String shortUrlKey = parts[0];
+                    String longUrl = parts[1];
+                    int accessCount = Integer.parseInt(parts[2]);
+                    LocalDateTime expirationDate = parts[3].equals("null") ? null : LocalDateTime.parse(parts[3]);
+                    URLDetails urlDetails = new URLDetails(longUrl, accessCount, expirationDate);
+                    urlMap.put(shortUrlKey, urlDetails);
+                    reverseUrlMap.put(longUrl, shortUrlKey);
+                }
+            }
+        } catch (IOException e) {
+            // No action needed if file doesn't exist
+        }
+    }
+
+    private void saveMappings() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(DATA_FILE))) {
+            for (String key : urlMap.keySet()) {
+                URLDetails urlDetails = urlMap.get(key);
+                writer.write(key + "," + urlDetails.getLongUrl() + "," + urlDetails.getAccessCount() + "," + urlDetails.getExpirationDate());
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.out.println("Error saving URL mappings: " + e.getMessage());
+        }
+    }
+
+    private boolean isValidURL(String url) {
+        return URL_PATTERN.matcher(url).matches();
+    }
+
+    public static void main(String[] args) {
+        LinkShortener linkShortener = new LinkShortener();
+        Scanner scanner = new Scanner(System.in);
+
+        while (true) {
+            System.out.println("Choose an option: 1. Shorten URL 2. Expand URL 3. URL Details 4. Exit");
+            int choice = scanner.nextInt();
+            scanner.nextLine(); // Consume newline
+
+            if (choice == 1) {
+                System.out.println("Enter the long URL:");
+                String longUrl = scanner.nextLine();
+                System.out.println("Enter custom alias (or leave blank):");
+                String customAlias = scanner.nextLine();
+                System.out.println("Enter expiration date (yyyy-MM-ddTHH:mm, or leave blank):");
+                String expirationDateInput = scanner.nextLine();
+                LocalDateTime expirationDate = expirationDateInput.isEmpty() ? null : LocalDateTime.parse(expirationDateInput);
+                String shortUrl = linkShortener.shortenURL(longUrl, customAlias, expirationDate);
+                System.out.println("Shortened URL: " + shortUrl);
+            } else if (choice == 2) {
+                System.out.println("Enter the short URL:");
+                String shortUrl = scanner.nextLine();
+                String longUrl = linkShortener.expandURL(shortUrl);
+                System.out.println("Original URL: " + longUrl);
+            } else if (choice == 3) {
+                System.out.println("Enter the short URL:");
+                String shortUrl = scanner.nextLine();
+                String details = linkShortener.getUrlDetails(shortUrl);
+                System.out.println("URL Details: " + details);
+            } else if (choice == 4) {
+                break;
+            } else {
+                System.out.println("Invalid choice, please try again.");
+            }
+        }
+        scanner.close();
+    }
+}
+
+class URLDetails {
+    private String longUrl;
+    private int accessCount;
+    private LocalDateTime expirationDate;
+
+    public URLDetails(String longUrl, LocalDateTime expirationDate) {
+        this.longUrl = longUrl;
+        this.accessCount = 0;
+        this.expirationDate = expirationDate;
+    }
+
+    public URLDetails(String longUrl, int accessCount, LocalDateTime expirationDate) {
+        this.longUrl = longUrl;
+        this.accessCount = accessCount;
+        this.expirationDate = expirationDate;
+    }
+
+    public String getLongUrl() {
+        return longUrl;
+    }
+
+    public int getAccessCount() {
+        return accessCount;
+    }
+
+    public void incrementAccessCount() {
+        this.accessCount++;
+    }
+
+    public LocalDateTime getExpirationDate() {
+        return expirationDate;
+    }
+
+    public void setExpirationDate(LocalDateTime expirationDate) {
+        this.expirationDate = expirationDate;
+    }
+
+    @Override
+    public String toString() {
+        return "Long URL: " + longUrl + "\nAccess Count: " + accessCount + "\nExpiration Date: " + (expirationDate == null ? "None" : expirationDate);
+    }
+}
